@@ -21,6 +21,6 @@ export default class StatusCommand extends SlashCommand {
   }
 
   override async run() {
-    return getStatus("office.kaiiserni.com");
+    return getStatus(process.env.MINECRAFT_SERVER);
   }
 }

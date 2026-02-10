@@ -30,14 +30,15 @@ async function createCommands(c: Client) {
 
 async function setStatus(c: Client) {
   if (c == null) return
-  const status = await getStatus("office.kaiiserni.com")
+  const status = await getStatus(process.env.MINECRAFT_SERVER)
   console.log(status)
-  c.user.setPresence({ activities: [{ name: status }], status: PresenceUpdateStatus.Idle })
+  c.user.setPresence({ activities: [{ name: status }], status: PresenceUpdateStatus.Online })
 }
 
 // listen for the client to be ready
 client.once(Events.ClientReady, c => {
   createCommands(c)
+  setStatus(c)
   setInterval(() => {
     setStatus(c)
   }, 30000);
