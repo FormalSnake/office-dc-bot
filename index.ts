@@ -2,6 +2,7 @@
 import { Client, Events, GatewayIntentBits, PresenceUpdateStatus } from "discord.js";
 const { SlashCreator, GatewayServer } = require('slash-create');
 import path from "node:path";
+import { getStatus } from './utils/mc-server'
 
 // create a new Client instance
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
@@ -27,10 +28,18 @@ async function createCommands(c: Client) {
   creator.syncCommands();
 }
 
+async function setStatus(c: Client) {
+  if (c == null) return
+  const status = await getStatus("office.kaiiserni.com")
+  console.log(status)
+  c.user.setPresence({ activities: [{ name: status[0] }], status: PresenceUpdateStatus.Idle })
+}
+
 // listen for the client to be ready
 client.once(Events.ClientReady, c => {
   createCommands(c)
-  c.user.setPresence({ activities: [{ name: 'activity' }], status: PresenceUpdateStatus.Idle })
+  setStatus(c)
+  // console.log(getStatus("office.kaiiserni.com"))
   console.log(`Ready! Logged in as ${c.user.tag}`);
 });
 
