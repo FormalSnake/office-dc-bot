@@ -32,7 +32,7 @@ async function setStatus(c: Client) {
   if (c == null) return
   const status = await getStatus("office.kaiiserni.com")
   console.log(status)
-  c.user.setPresence({ activities: [{ name: status[0] }], status: PresenceUpdateStatus.Idle })
+  c.user.setPresence({ activities: [{ name: status }], status: PresenceUpdateStatus.Idle })
 }
 
 // listen for the client to be ready
