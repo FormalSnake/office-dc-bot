@@ -32,15 +32,15 @@ async function setStatus(c: Client) {
   if (c == null) return
   const status = await getStatus("office.kaiiserni.com")
   console.log(status)
-  setInterval(() => {
-    c.user.setPresence({ activities: [{ name: status }], status: PresenceUpdateStatus.Idle })
-  }, 3000)
+  c.user.setPresence({ activities: [{ name: status }], status: PresenceUpdateStatus.Idle })
 }
 
 // listen for the client to be ready
 client.once(Events.ClientReady, c => {
   createCommands(c)
-  setStatus(c)
+  setInterval(() => {
+    setStatus(c)
+  }, 30000);
   // console.log(getStatus("office.kaiiserni.com"))
   console.log(`Ready! Logged in as ${c.user.tag}`);
 });
