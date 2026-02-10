@@ -1,32 +1,36 @@
 // import discord.js
-import { Client, Events, GatewayIntentBits } from "discord.js";
-
-type ResponseType = {
-  ip: string,
-  port: string,
-  debug: any,
-  motd: any
-  players: any,
-  version: string,
-  online: boolean,
-  protocol: any,
-  hostname: string,
-  eula_blocked: boolean
-}
+import { Client, Events, GatewayIntentBits, PresenceUpdateStatus } from "discord.js";
+const { SlashCreator, GatewayServer } = require('slash-create');
+import path from "node:path";
 
 // create a new Client instance
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-async function getStatus(server: string) {
-  const response = await fetch(`https://api.mcsrvstat.us/3/${server}`)
-  const status: ResponseType = await response.json()
-  console.log(status.motd.clean)
-  return status
+const creator = new SlashCreator({
+  applicationID: '1470828681088864419',
+  publicKey: '7039b81d45417564cff04ec3e032cc2bce20d99fe9b9d36425c907ecdba67229',
+  token: process.env.DISCORD_TOKEN,
+  client
+});
+
+creator
+  .withServer(
+    new GatewayServer(
+      (handler: any) => client.ws.on('INTERACTION_CREATE', handler)
+    )
+  );
+
+async function createCommands(c: Client) {
+  console.log("registering commands")
+  // console.log(c)
+  await creator.registerCommandsIn(path.join(__dirname, "commands"));
+  creator.syncCommands();
 }
 
 // listen for the client to be ready
 client.once(Events.ClientReady, c => {
-  getStatus("office.kaiiserni.com")
+  createCommands(c)
+  c.user.setPresence({ activities: [{ name: 'activity' }], status: PresenceUpdateStatus.Idle })
   console.log(`Ready! Logged in as ${c.user.tag}`);
 });
 
