@@ -23,7 +23,7 @@ creator
 
 async function createCommands(c: Client) {
   console.log("registering commands")
-  // console.log(c)
+  console.log(path.join(__dirname, "commands"))
   await creator.registerCommandsIn(path.join(__dirname, "commands"));
   creator.syncCommands();
 }

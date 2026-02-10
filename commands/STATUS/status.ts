@@ -20,7 +20,7 @@ export default class StatusCommand extends SlashCommand {
     this.filePath = __filename;
   }
 
-  async run() {
+  override async run() {
     return getStatus("office.kaiiserni.com");
   }
 }
