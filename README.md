@@ -1,5 +1,7 @@
 # office-dc-bot
 
+A discord bot that shows the status of a Minecraft server in a discord status
+
 To install dependencies:
 
 ```bash
