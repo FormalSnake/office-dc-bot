@@ -2,17 +2,16 @@ import {
   ContainerBuilder,
   InteractionContextType,
   MessageFlags,
-  SectionBuilder,
   SeparatorBuilder,
   SeparatorSpacingSize,
   SlashCommandBuilder,
   TextDisplayBuilder,
-  ThumbnailBuilder,
   time,
   TimestampStyles,
   type APIEmbedField,
 } from 'discord.js'
 import { currentSessionMs, getPlayer, topPlayers } from '../utils/db'
+import { headEmojis } from '../utils/head-emoji'
 import { readPlayerWorldStats, readWorldStats, type WorldStats } from '../utils/mc-stats'
 import { formatDuration, isValidUsername } from '../utils/mc-text'
 import { BRAND, SERVER_HOST, brandEmbed, headUrl } from '../utils/theme'
@@ -35,37 +34,35 @@ const MEDALS = ['🥇', '🥈', '🥉']
 
 export interface Row {
   name: string
+  head: string
   online: boolean
   stats: { emoji: string; value: string; primary?: boolean }[]
 }
 
-// The podium gets a section per player with their head as the thumbnail (Discord
-// draws those at one fixed size); everyone below is a compact line.
+// One line per player: rank, head emoji, name, then the stats with the sorted one in bold.
 export function leaderboard(subtitle: string, rows: Row[]) {
-  const line = (row: Row) => row.stats.map((s) => `${s.emoji} ${s.primary ? `**${s.value}**` : s.value}`).join('  ·  ')
+  const line = (row: Row, i: number) => {
+    const rank = MEDALS[i] ?? `**${i + 1}.**`
+    const head = row.head ? `${row.head} ` : ''
+    const stats = row.stats.map((s) => `${s.emoji} ${s.primary ? `**${s.value}**` : s.value}`).join('  ·  ')
+    return `${rank} ${head}**${row.name}**${row.online ? ' 🟢' : ''}  ·  ${stats}`
+  }
   const container = new ContainerBuilder()
     .setAccentColor(BRAND.gold)
     .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## 🏆 ${BRAND.name} leaderboard\n-# ${subtitle} · 🟢 online now`))
     .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
-
-  rows.slice(0, 3).forEach((row, i) => {
-    container.addSectionComponents(
-      new SectionBuilder()
-        .addTextDisplayComponents(new TextDisplayBuilder().setContent(`${MEDALS[i]} **${row.name}**${row.online ? ' 🟢' : ''}\n${line(row)}`))
-        .setThumbnailAccessory(new ThumbnailBuilder().setURL(headUrl(row.name, 64))),
-    )
-  })
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(rows.slice(0, 3).map(line).join('\n')))
 
   const rest = rows.slice(3)
   if (rest.length) {
     container
       .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
-      .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(rest.map((row, i) => `**${i + 4}.** ${row.name}${row.online ? ' 🟢' : ''}  ·  ${line(row)}`).join('\n')),
-      )
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(rest.map((row, i) => line(row, i + 3)).join('\n')))
   }
 
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# ${BRAND.name} · ${SERVER_HOST}`))
+  container
+    .addSeparatorComponents(new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# ${BRAND.name} · ${SERVER_HOST}`))
   return { components: [container], flags: MessageFlags.IsComponentsV2 } as const
 }
 
@@ -143,11 +140,14 @@ export const stats: Command = {
 
     if (world.length) {
       const rows = [...world].sort((a, b) => b[sortKey] - a[sortKey]).slice(0, 10)
-      await interaction.reply(
+      await interaction.deferReply()
+      const heads = await headEmojis(interaction.client, rows.map((s) => s.name))
+      await interaction.editReply(
         leaderboard(
           `Sorted by ${sort.label.toLowerCase()}`,
           rows.map((s) => ({
             name: s.name,
+            head: heads.get(s.name) ?? '',
             online: currentSessionMs(s.name) !== null,
             stats:
               sortKey === 'playtimeMs'
@@ -173,13 +173,16 @@ export const stats: Command = {
       })
       return
     }
-    await interaction.reply(
+    await interaction.deferReply()
+    const heads = await headEmojis(interaction.client, top.map((p) => p.name))
+    await interaction.editReply(
       leaderboard(
         'Sorted by playtime',
         top.map((p) => {
           const live = currentSessionMs(p.name)
           return {
             name: p.name,
+            head: heads.get(p.name) ?? '',
             online: live !== null,
             stats: [
               { emoji: '⏱️', value: formatDuration(p.playtimeMs + (live ?? 0)), primary: true },

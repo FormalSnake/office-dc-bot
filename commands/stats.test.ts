@@ -10,6 +10,7 @@ function countComponents(node: any): number {
 test('leaderboard stays under the 40 component limit with ten rows', () => {
   const rows = Array.from({ length: 10 }, (_, i) => ({
     name: `Player${i}`,
+    head: `<:mc_Player${i}:${1000 + i}>`,
     online: i % 2 === 0,
     stats: [
       { emoji: '⏱️', value: '1h', primary: true },

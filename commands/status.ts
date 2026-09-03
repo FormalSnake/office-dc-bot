@@ -1,4 +1,5 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, InteractionContextType, SlashCommandBuilder } from 'discord.js'
+import { headEmojis } from '../utils/head-emoji'
 import { getLiveStatus, getServerData } from '../utils/mc-server'
 import { dayPhase, ticksToClock } from '../utils/mc-text'
 import { BLUEMAP_URL, BRAND, SERVER_HOST, brandEmbed, headUrl } from '../utils/theme'
@@ -54,7 +55,8 @@ export const status: Command = {
     embed.addFields({ name: 'Address', value: `\`${SERVER_HOST}\``, inline: true })
 
     if (live.players.length) {
-      embed.addFields({ name: 'Online now', value: live.players.map((p) => `**${p}**`).join(', ') })
+      const heads = await headEmojis(interaction.client, live.players)
+      embed.addFields({ name: 'Online now', value: live.players.map((p) => `${heads.get(p) ?? ''} **${p}**`.trim()).join('   ') })
     }
 
     await interaction.editReply({ embeds: [embed], components: linkButtons() })
