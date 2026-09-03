@@ -39,24 +39,31 @@ export interface Row {
   stats: { emoji: string; value: string; primary?: boolean }[]
 }
 
-// One section per player with their head as the thumbnail. Components v2 caps a
-// message at 40 components, so ten rows leave room for the header and footer only.
+// The podium gets a section per player with their head as the thumbnail (Discord
+// draws those at one fixed size); everyone below is a compact line.
 export function leaderboard(subtitle: string, rows: Row[]) {
+  const line = (row: Row) => row.stats.map((s) => `${s.emoji} ${s.primary ? `**${s.value}**` : s.value}`).join('  ·  ')
   const container = new ContainerBuilder()
     .setAccentColor(BRAND.gold)
     .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## 🏆 ${BRAND.name} leaderboard\n-# ${subtitle} · 🟢 online now`))
     .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
 
-  rows.forEach((row, i) => {
-    const rank = MEDALS[i] ?? `**${i + 1}.**`
-    const stats = row.stats.map((s) => `${s.emoji} ${s.primary ? `**${s.value}**` : s.value}`).join('   ')
+  rows.slice(0, 3).forEach((row, i) => {
     container.addSectionComponents(
       new SectionBuilder()
-        .addTextDisplayComponents(new TextDisplayBuilder().setContent(`${rank} **${row.name}**${row.online ? ' 🟢' : ''}\n${stats}`))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(`${MEDALS[i]} **${row.name}**${row.online ? ' 🟢' : ''}\n${line(row)}`))
         .setThumbnailAccessory(new ThumbnailBuilder().setURL(headUrl(row.name, 64))),
     )
-    if (i === 2 && rows.length > 3) container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
   })
+
+  const rest = rows.slice(3)
+  if (rest.length) {
+    container
+      .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(rest.map((row, i) => `**${i + 4}.** ${row.name}${row.online ? ' 🟢' : ''}  ·  ${line(row)}`).join('\n')),
+      )
+  }
 
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# ${BRAND.name} · ${SERVER_HOST}`))
   return { components: [container], flags: MessageFlags.IsComponentsV2 } as const
