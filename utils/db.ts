@@ -14,9 +14,9 @@ db.run(`
   )
 `)
 
-export type SettingKey = 'console_channel' | 'activity_channel' | 'admin_role' | 'player_role'
+export type SettingKey = 'console_channel' | 'activity_channel' | 'chat_channel' | 'admin_role' | 'player_role'
 
-export const SETTING_KEYS: SettingKey[] = ['console_channel', 'activity_channel', 'admin_role', 'player_role']
+export const SETTING_KEYS: SettingKey[] = ['console_channel', 'activity_channel', 'chat_channel', 'admin_role', 'player_role']
 
 const selectOne = db.query<{ value: string }, [string, string]>(
   'SELECT value FROM settings WHERE guild_id = ? AND key = ?',

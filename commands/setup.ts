@@ -6,6 +6,7 @@ import type { Command } from './types'
 const LABELS: Record<SettingKey, string> = {
   console_channel: 'Console channel',
   activity_channel: 'Activity channel',
+  chat_channel: 'Chat channel',
   admin_role: 'Admin role',
   player_role: 'Player role',
 }
@@ -34,6 +35,12 @@ export const setup: Command = {
       s
         .setName('activity')
         .setDescription('Channel that gets join, leave and up/down notices')
+        .addChannelOption((o) => o.setName('channel').setDescription('Channel').setRequired(true).addChannelTypes(ChannelType.GuildText)),
+    )
+    .addSubcommand((s) =>
+      s
+        .setName('chat')
+        .setDescription('Channel bridged with in-game chat: messages, deaths and advancements')
         .addChannelOption((o) => o.setName('channel').setDescription('Channel').setRequired(true).addChannelTypes(ChannelType.GuildText)),
     )
     .addSubcommand((s) =>
@@ -84,6 +91,12 @@ export const setup: Command = {
         const channel = interaction.options.getChannel('channel', true, [ChannelType.GuildText])
         setSetting(guildId, 'activity_channel', channel.id)
         note = `Join and leave notices go to ${channel}.`
+        break
+      }
+      case 'chat': {
+        const channel = interaction.options.getChannel('channel', true, [ChannelType.GuildText])
+        setSetting(guildId, 'chat_channel', channel.id)
+        note = `In-game chat, deaths and advancements show up in ${channel}. Messages posted there go in-game once MESSAGE_CONTENT is on.`
         break
       }
       case 'admin-role': {

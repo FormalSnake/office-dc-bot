@@ -12,21 +12,28 @@ import {
 } from 'discord.js'
 import { commands, commandsByName } from './commands'
 import { isDangerous, normalizeCommand, runConsole } from './commands/console'
+import { cleanChatText, sendDiscordChat } from './commands/say'
 import { isAdmin } from './utils/access'
 import { awaitConfirmation, confirmRow } from './utils/confirm'
-import { getSetting, getSettingForAllGuilds } from './utils/db'
+import { getSetting, getSettingForAllGuilds, type SettingKey } from './utils/db'
+import { tailFile } from './utils/log-tail'
+import { parseLogLine, type McEvent } from './utils/mc-events'
 import { getLiveStatus, type LiveStatus } from './utils/mc-server'
 import { codeBlock } from './utils/mc-text'
 import { RconUnavailable, rconConfigured } from './utils/rcon'
 import { BRAND, SERVER_HOST, headUrl } from './utils/theme'
+import { sendAsPlayer } from './utils/webhook'
 
-// Raw message relay in the console channel needs the Message Content intent,
-// which has to be switched on in the Discord developer portal first.
-const consoleRelay = process.env.CONSOLE_RELAY === '1'
+// Reading what people type in Discord (console relay, chat bridge) needs the
+// Message Content intent, which has to be switched on in the developer portal first.
+const messageContent = process.env.MESSAGE_CONTENT === '1'
+// With the server log mounted, chat, deaths, advancements and joins come straight
+// from the log instead of the 30 second RCON poll.
+const logPath = process.env.MC_LOG_PATH
 const POLL_MS = 30_000
 
 const intents = [GatewayIntentBits.Guilds]
-if (consoleRelay) intents.push(GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent)
+if (messageContent) intents.push(GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent)
 
 const client = new Client({ intents })
 
@@ -60,8 +67,31 @@ function setPresence(c: Client<true>, live: LiveStatus) {
   })
 }
 
+async function postEmbeds(c: Client<true>, key: SettingKey, embeds: EmbedBuilder[]) {
+  for (const { guildId, value: channelId } of getSettingForAllGuilds(key)) {
+    try {
+      const channel = await c.channels.fetch(channelId)
+      if (!channel?.isSendable()) continue
+      await channel.send({ embeds: embeds.slice(0, 10) })
+    } catch (e) {
+      console.error(`[${key}] failed to post in ${channelId} (guild ${guildId}):`, (e as Error).message)
+    }
+  }
+}
+
+async function postAsPlayer(c: Client<true>, key: SettingKey, player: string, content: string) {
+  for (const { value: channelId } of getSettingForAllGuilds(key)) {
+    try {
+      await sendAsPlayer(c, channelId, player, content)
+    } catch (e) {
+      console.error(`[${key}] webhook post in ${channelId} failed:`, (e as Error).message)
+    }
+  }
+}
+
 let previous: { online: boolean; players: Set<string>; source: LiveStatus['source'] } | null = null
 
+// Poll-based notices, used when the server log is not available.
 async function announce(c: Client<true>, live: LiveStatus) {
   const current = new Set(live.players)
   const before = previous
@@ -90,26 +120,41 @@ async function announce(c: Client<true>, live: LiveStatus) {
       }
     }
   }
-  if (!embeds.length) return
-
-  for (const { guildId, value: channelId } of getSettingForAllGuilds('activity_channel')) {
-    try {
-      const channel = await c.channels.fetch(channelId)
-      if (!channel?.isSendable()) continue
-      await channel.send({ embeds: embeds.slice(0, 10) })
-    } catch (e) {
-      console.error(`[activity] failed to post in ${channelId} (guild ${guildId}):`, (e as Error).message)
-    }
-  }
+  if (embeds.length) await postEmbeds(c, 'activity_channel', embeds)
 }
 
 async function poll(c: Client<true>) {
   try {
     const live = await getLiveStatus(SERVER_HOST)
     setPresence(c, live)
-    await announce(c, live)
+    if (!logPath) await announce(c, live)
   } catch (e) {
     console.error('[poll]', e)
+  }
+}
+
+const ADVANCEMENT_LABEL = {
+  advancement: '🏆 *has made the advancement*',
+  goal: '🎯 *has reached the goal*',
+  challenge: '🏅 *has completed the challenge*',
+} as const
+
+async function handleEvent(c: Client<true>, event: McEvent) {
+  switch (event.type) {
+    case 'chat':
+      return postAsPlayer(c, 'chat_channel', event.player, event.text)
+    case 'death':
+      return postAsPlayer(c, 'chat_channel', event.player, `💀 *${event.text}*`)
+    case 'advancement':
+      return postAsPlayer(c, 'chat_channel', event.player, `${ADVANCEMENT_LABEL[event.kind]} **${event.title}**`)
+    case 'join':
+      return postAsPlayer(c, 'activity_channel', event.player, '➡️ *joined the game*')
+    case 'leave':
+      return postAsPlayer(c, 'activity_channel', event.player, '⬅️ *left the game*')
+    case 'started':
+      return postEmbeds(c, 'activity_channel', [new EmbedBuilder().setColor(BRAND.green).setDescription(`🟢 **${BRAND.name} is online**`)])
+    case 'stopping':
+      return postEmbeds(c, 'activity_channel', [new EmbedBuilder().setColor(BRAND.red).setDescription(`🔴 **${BRAND.name} is stopping**`)])
   }
 }
 
@@ -135,9 +180,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
 })
 
 async function relayConsoleMessage(message: Message<true>) {
-  const consoleChannel = getSetting(message.guildId, 'console_channel')
-  if (!consoleChannel || message.channelId !== consoleChannel) return
-
   const member = message.member ?? (await message.guild.members.fetch(message.author.id))
   if (!isAdmin(member)) {
     await message.react('🚫').catch(() => {})
@@ -162,10 +204,28 @@ async function relayConsoleMessage(message: Message<true>) {
   }
 }
 
-if (consoleRelay) {
+async function relayChatMessage(message: Message<true>) {
+  const parts = [cleanChatText(message.cleanContent)]
+  if (message.attachments.size) parts.push(`[${message.attachments.size} attachment${message.attachments.size > 1 ? 's' : ''}]`)
+  const text = parts.filter(Boolean).join(' ').slice(0, 256)
+  if (!text) return
+  const name = message.member?.displayName ?? message.author.displayName
+  try {
+    await sendDiscordChat(name, text)
+  } catch (e) {
+    console.error('[chat relay]', (e as Error).message)
+    await message.react('⚠️').catch(() => {})
+  }
+}
+
+if (messageContent) {
   client.on(Events.MessageCreate, (message) => {
-    if (message.author.bot || !message.inGuild()) return
-    relayConsoleMessage(message).catch((e) => console.error('[console relay]', e))
+    if (message.author.bot || message.webhookId || !message.inGuild()) return
+    if (message.channelId === getSetting(message.guildId, 'console_channel')) {
+      relayConsoleMessage(message).catch((e) => console.error('[console relay]', e))
+    } else if (message.channelId === getSetting(message.guildId, 'chat_channel')) {
+      relayChatMessage(message).catch((e) => console.error('[chat relay]', e))
+    }
   })
 }
 
@@ -175,6 +235,14 @@ client.once(Events.ClientReady, async (c) => {
   await registerCommands(c).catch((e) => console.error('Command registration failed:', e))
   await poll(c)
   setInterval(() => poll(c), POLL_MS)
+
+  if (logPath) {
+    console.log(`Following server log ${logPath}`)
+    tailFile(logPath, (line) => {
+      const event = parseLogLine(line)
+      if (event) handleEvent(c, event).catch((e) => console.error('[log event]', e))
+    })
+  }
 })
 
 client.login(process.env.DISCORD_TOKEN)

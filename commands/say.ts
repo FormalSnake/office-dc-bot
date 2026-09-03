@@ -10,6 +10,16 @@ export function cleanChatText(input: string): string {
     .trim()
 }
 
+// Shows in-game as "[Discord] Name: text" in the MOTD gold.
+export async function sendDiscordChat(name: string, text: string) {
+  const component = [
+    { text: '[Discord] ', color: 'gold' },
+    { text: `${name}: `, color: 'yellow' },
+    { text, color: 'white' },
+  ]
+  await rcon(`tellraw @a ${JSON.stringify(component)}`)
+}
+
 export const say: Command = {
   data: new SlashCommandBuilder()
     .setName('say')
@@ -34,13 +44,8 @@ export const say: Command = {
     }
 
     const name = interaction.member.displayName
-    const component = [
-      { text: '[Discord] ', color: 'gold' },
-      { text: `${name}: `, color: 'yellow' },
-      { text, color: 'white' },
-    ]
     await interaction.deferReply()
-    await rcon(`tellraw @a ${JSON.stringify(component)}`)
+    await sendDiscordChat(name, text)
     console.log(`[say] ${interaction.user.tag}: ${text}`)
     await interaction.editReply({ content: `📣 **${name}**: ${text}`, allowedMentions: { parse: [] } })
   },
