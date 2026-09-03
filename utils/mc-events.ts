@@ -4,6 +4,7 @@ export type McEvent =
   | { type: 'leave'; player: string }
   | { type: 'death'; player: string; text: string }
   | { type: 'advancement'; player: string; kind: 'advancement' | 'goal' | 'challenge'; title: string }
+  | { type: 'admin'; source: string; message: string }
   | { type: 'started' }
   | { type: 'stopping' }
 
@@ -36,6 +37,10 @@ export function parseLogLine(line: string): McEvent | null {
 
   const adv = body.match(new RegExp(`^(${NAME}) has (made the advancement|reached the goal|completed the challenge) \\[(.+)\\]$`))
   if (adv) return { type: 'advancement', player: adv[1]!, kind: ADVANCEMENT_KIND[adv[2]!]!, title: adv[3]! }
+
+  // Op-level command feedback is broadcast to admins and logged as "[Source: message]".
+  const admin = body.match(new RegExp(`^\\[(Rcon|Server|${NAME}): (.+)\\]$`))
+  if (admin) return { type: 'admin', source: admin[1]!, message: admin[2]! }
 
   if (/^Done \([\d.]+s\)! For help, type "help"/.test(body)) return { type: 'started' }
   if (/^Stopping (the )?server/.test(body)) return { type: 'stopping' }

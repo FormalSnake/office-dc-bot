@@ -24,7 +24,7 @@ Discord bot for the Biggyatia Minecraft server. Shows live status in its presenc
 
 - **activity**: joins (with a first-time celebration) and leaves (with session length), server up and down.
 - **chat**: in-game chat as plain text, deaths as red embeds, advancements as gold, aqua or purple embeds. Everything is posted through a webhook as the player, head included. With `MESSAGE_CONTENT=1`, messages typed in this channel go in-game as `[Discord] Name: text`.
-- **console**: `/console` only works here. With `MESSAGE_CONTENT=1` plain messages from admins run as commands too.
+- **console**: `/console` only works here. With `MESSAGE_CONTENT=1` plain messages from admins run as commands too. Op-level actions taken in-game or over RCON (`[FormalSnake: Set own game mode to Creative Mode]`) are relayed here as well, as the player, so the channel doubles as the admin log.
 
 Chat, deaths, advancements and joins come from the server log under `MC_DATA_PATH`. `/stats` reads the server's own per-player statistics and advancements from the same directory (all-time playtime, deaths, kills, diamonds, distance, blocks mined); the bot keeps its own playtime, death and advancement counters in SQLite as the fallback when the directory is not mounted. Without the log the bot falls back to diffing an RCON `list` every 30 seconds, which gives joins and leaves only.
 

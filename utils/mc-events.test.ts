@@ -42,3 +42,9 @@ test('noise is ignored', () => {
   expect(parseLogLine(info('Saving chunks for level'))).toBeNull()
   expect(parseLogLine('[18:14:43] [Render thread/INFO]: <Bob> hi')).toBeNull()
 })
+
+test('admin feedback lines', () => {
+  expect(parseLogLine(info('[FormalSnake: Set own game mode to Creative Mode]'))).toEqual({ type: 'admin', source: 'FormalSnake', message: 'Set own game mode to Creative Mode' })
+  expect(parseLogLine(info('[Rcon: Made FormalSnake a server operator]'))).toEqual({ type: 'admin', source: 'Rcon', message: 'Made FormalSnake a server operator' })
+  expect(parseLogLine(info('[Not Secure] <FormalSnake> [hi]'))?.type).toBe('chat')
+})

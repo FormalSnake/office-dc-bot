@@ -12,7 +12,7 @@ import type { McEvent } from './mc-events'
 import { parseList } from './mc-server'
 import { formatDuration } from './mc-text'
 import { readPlayerWorldStats } from './mc-stats'
-import { rcon, rconConfigured } from './rcon'
+import { botCommandRecently, rcon, rconConfigured } from './rcon'
 import { BRAND } from './theme'
 import { sendAsPlayer } from './webhook'
 
@@ -57,6 +57,22 @@ async function onlineCount(): Promise<string | null> {
 function footer(...parts: (string | null | undefined)[]): string | null {
   const text = parts.filter(Boolean).join(' · ')
   return text || null
+}
+
+// Console and RCON feedback can come in bursts (chunk pregeneration progress, for
+// one); cap what reaches Discord.
+const rconRelay = { windowStart: 0, count: 0 }
+const RCON_RELAY_PER_MINUTE = 10
+
+async function relayAdmin(c: Client<true>, source: string, message: string) {
+  if (source === 'Rcon' || source === 'Server') {
+    if (botCommandRecently()) return
+    const now = Date.now()
+    if (now - rconRelay.windowStart > 60_000) Object.assign(rconRelay, { windowStart: now, count: 0 })
+    if (++rconRelay.count > RCON_RELAY_PER_MINUTE) return
+    return postEmbeds(c, 'console_channel', [new EmbedBuilder().setColor(BRAND.grey).setDescription(`🖥️ **${source}** · ${escapeMarkdown(message)}`)])
+  }
+  return postAsPlayer(c, 'console_channel', source, { content: `🛠️ ${escapeMarkdown(message)}` })
 }
 
 export async function handleEvent(c: Client<true>, event: McEvent) {
@@ -106,6 +122,9 @@ export async function handleEvent(c: Client<true>, event: McEvent) {
       if (text) embed.setFooter({ text })
       return postAsPlayer(c, 'activity_channel', event.player, { embeds: [embed] })
     }
+
+    case 'admin':
+      return relayAdmin(c, event.source, event.message)
 
     case 'started':
       return postEmbeds(c, 'activity_channel', [new EmbedBuilder().setColor(BRAND.green).setDescription(`🟢 **${BRAND.name} is online**`)])

@@ -2,7 +2,7 @@ import { InteractionContextType, MessageFlags, PermissionFlagsBits, SlashCommand
 import { isAdmin } from '../utils/access'
 import { parseWhitelist } from '../utils/mc-server'
 import { isValidUsername } from '../utils/mc-text'
-import { rcon } from '../utils/rcon'
+import { noteBotCommand, rcon } from '../utils/rcon'
 import { BRAND, brandEmbed, headUrl } from '../utils/theme'
 import type { Command } from './types'
 
@@ -51,6 +51,7 @@ export const whitelist: Command = {
     }
     await interaction.deferReply()
 
+    noteBotCommand()
     const output = await rcon(`whitelist ${sub} ${name}`)
     console.log(`[whitelist] ${interaction.user.tag}: whitelist ${sub} ${name} -> ${output}`)
 

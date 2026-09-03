@@ -9,6 +9,14 @@ export const rconConfigured = Boolean(host && password)
 
 export class RconUnavailable extends Error {}
 
+// Commands the bot runs on someone's behalf echo back through the server log as
+// "[Rcon: ...]"; the log relay uses this to skip those since the reply already shows them.
+let lastBotCommandAt = 0
+export const noteBotCommand = () => {
+  lastBotCommandAt = Date.now()
+}
+export const botCommandRecently = (windowMs = 5000) => Date.now() - lastBotCommandAt < windowMs
+
 let client: Rcon | null = null
 let connecting: Promise<Rcon> | null = null
 

@@ -3,7 +3,7 @@ import { isAdmin } from '../utils/access'
 import { awaitConfirmation, confirmRow } from '../utils/confirm'
 import { getSetting } from '../utils/db'
 import { codeBlock } from '../utils/mc-text'
-import { rcon, rconConfigured } from '../utils/rcon'
+import { noteBotCommand, rcon, rconConfigured } from '../utils/rcon'
 import type { Command } from './types'
 
 // Commands that kick people, hand out power or take the server down get a confirm step.
@@ -21,6 +21,7 @@ export function normalizeCommand(input: string): string {
 
 export async function runConsole(command: string, user: User): Promise<string> {
   console.log(`[console] ${user.tag} (${user.id}): ${command}`)
+  noteBotCommand()
   const output = await rcon(command)
   return `> ${command}\n${output}`
 }
