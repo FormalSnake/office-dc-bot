@@ -11,6 +11,7 @@ import {
 import type { McEvent } from './mc-events'
 import { parseList } from './mc-server'
 import { formatDuration } from './mc-text'
+import { readPlayerWorldStats } from './mc-stats'
 import { rcon, rconConfigured } from './rcon'
 import { BRAND } from './theme'
 import { sendAsPlayer } from './webhook'
@@ -64,7 +65,9 @@ export async function handleEvent(c: Client<true>, event: McEvent) {
       return postAsPlayer(c, 'chat_channel', event.player, { content: escapeMarkdown(event.text) })
 
     case 'death': {
-      const count = recordDeath(event.player)
+      const own = recordDeath(event.player)
+      const world = await readPlayerWorldStats(event.player)
+      const count = world ? Math.max(world.deaths + 1, own) : own
       const embed = new EmbedBuilder().setColor(BRAND.red).setDescription(`💀 ${event.text}`)
       const text = footer(`Death #${count}`)
       if (text) embed.setFooter({ text })
@@ -72,7 +75,9 @@ export async function handleEvent(c: Client<true>, event: McEvent) {
     }
 
     case 'advancement': {
-      const count = recordAdvancement(event.player)
+      const own = recordAdvancement(event.player)
+      const world = await readPlayerWorldStats(event.player)
+      const count = world ? Math.max(world.advancements + 1, own) : own
       const style = ADVANCEMENT_STYLE[event.kind]
       const embed = new EmbedBuilder()
         .setColor(style.color)
@@ -84,7 +89,8 @@ export async function handleEvent(c: Client<true>, event: McEvent) {
     }
 
     case 'join': {
-      const first = recordJoin(event.player)
+      const known = await readPlayerWorldStats(event.player)
+      const first = recordJoin(event.player) && known === null
       const embed = new EmbedBuilder()
         .setColor(BRAND.green)
         .setDescription(first ? `➡️ joined the game\n🎉 **First time on ${BRAND.name}!**` : '➡️ joined the game')

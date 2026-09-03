@@ -1,7 +1,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, InteractionContextType, MessageFlags, SlashCommandBuilder } from 'discord.js'
 import { getLiveStatus, parseWhitelist } from '../utils/mc-server'
-import { formatDuration, isValidUsername } from '../utils/mc-text'
-import { currentSessionMs, getPlayer } from '../utils/db'
+import { isValidUsername } from '../utils/mc-text'
+import { statsFields } from './stats'
 import { rcon, rconConfigured } from '../utils/rcon'
 import { SERVER_HOST, bodyUrl, brandEmbed, headUrl } from '../utils/theme'
 import type { Command } from './types'
@@ -37,14 +37,8 @@ export const player: Command = {
         { name: 'Whitelisted', value: whitelisted === null ? '❔ Unknown' : whitelisted ? '✅ Yes' : '❌ No', inline: true },
       )
 
-    const stats = getPlayer(name)
-    if (stats) {
-      embed.addFields(
-        { name: 'Playtime', value: formatDuration(stats.playtimeMs + (currentSessionMs(stats.name) ?? 0)), inline: true },
-        { name: 'Deaths', value: String(stats.deaths), inline: true },
-        { name: 'Advancements', value: String(stats.advancements), inline: true },
-      )
-    }
+    const fields = await statsFields(name)
+    if (fields) embed.addFields(fields)
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('NameMC').setURL(`https://namemc.com/profile/${encodeURIComponent(name)}`),

@@ -19,6 +19,7 @@ import { getSetting, reconcileSessions } from './utils/db'
 import { handleEvent, postEmbeds } from './utils/events'
 import { tailFile } from './utils/log-tail'
 import { parseLogLine } from './utils/mc-events'
+import { logPath } from './utils/mc-stats'
 import { getLiveStatus, type LiveStatus } from './utils/mc-server'
 import { codeBlock, dayPhase, ticksToClock } from './utils/mc-text'
 import { RconUnavailable, rconConfigured } from './utils/rcon'
@@ -27,9 +28,8 @@ import { BRAND, SERVER_HOST, headUrl } from './utils/theme'
 // Reading what people type in Discord (console relay, chat bridge) needs the
 // Message Content intent, which has to be switched on in the developer portal first.
 const messageContent = process.env.MESSAGE_CONTENT === '1'
-// With the server log mounted, chat, deaths, advancements and joins come straight
-// from the log instead of the 30 second RCON poll.
-const logPath = process.env.MC_LOG_PATH
+// With the server data directory mounted (MC_DATA_PATH), chat, deaths, advancements
+// and joins come straight from the log instead of the 30 second RCON poll.
 const POLL_MS = 30_000
 
 const intents = [GatewayIntentBits.Guilds]

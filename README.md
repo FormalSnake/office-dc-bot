@@ -26,7 +26,7 @@ Discord bot for the Biggyatia Minecraft server. Shows live status in its presenc
 - **chat**: in-game chat as plain text, deaths as red embeds, advancements as gold, aqua or purple embeds. Everything is posted through a webhook as the player, head included. With `MESSAGE_CONTENT=1`, messages typed in this channel go in-game as `[Discord] Name: text`.
 - **console**: `/console` only works here. With `MESSAGE_CONTENT=1` plain messages from admins run as commands too.
 
-Chat, deaths, advancements and joins come from the server log (`MC_LOG_PATH`). The same events feed per-player playtime, death and advancement counters in SQLite. Without the log the bot falls back to diffing an RCON `list` every 30 seconds, which gives joins and leaves only.
+Chat, deaths, advancements and joins come from the server log under `MC_DATA_PATH`. `/stats` reads the server's own per-player statistics and advancements from the same directory (all-time playtime, deaths, kills, diamonds, distance, blocks mined); the bot keeps its own playtime, death and advancement counters in SQLite as the fallback when the directory is not mounted. Without the log the bot falls back to diffing an RCON `list` every 30 seconds, which gives joins and leaves only.
 
 ## Setup
 
@@ -42,7 +42,7 @@ Whitelist changes made through the bot persist: the itzg image only seeds `white
 
 ## Deploy
 
-The bot runs on superserver as the `bot` service in `/mnt/docker/minecraft/minecraft-26.2/docker-compose.yml`, next to the Minecraft container. It builds straight from this repository at a pinned commit, reads `bot.env` for secrets, reaches RCON over the compose network (`RCON_HOST=minecraft`) and has the server's `logs/` mounted read-only at `/logs`.
+The bot runs on superserver as the `bot` service in `/mnt/docker/minecraft/minecraft-26.2/docker-compose.yml`, next to the Minecraft container. It builds straight from this repository at a pinned commit, reads `bot.env` for secrets, reaches RCON over the compose network (`RCON_HOST=minecraft`) and has the server's data directory mounted read-only at `/mc` (`MC_DATA_PATH=/mc`).
 
 To ship a new version: push, put the new commit hash in the `build.context` line, then
 
