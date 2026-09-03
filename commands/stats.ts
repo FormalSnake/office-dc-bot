@@ -2,22 +2,21 @@ import { InteractionContextType, MessageFlags, SlashCommandBuilder, time, Timest
 import { currentSessionMs, getPlayer, topPlayers } from '../utils/db'
 import { readPlayerWorldStats, readWorldStats, type WorldStats } from '../utils/mc-stats'
 import { formatDuration, isValidUsername } from '../utils/mc-text'
+import { table } from '../utils/table'
 import { BRAND, brandEmbed, headUrl } from '../utils/theme'
 import type { Command } from './types'
 
-const MEDALS = ['🥇', '🥈', '🥉']
-
 type SortKey = 'playtimeMs' | 'deaths' | 'advancements' | 'mobKills' | 'playerKills' | 'diamonds' | 'distanceKm' | 'blocksMined'
 
-const SORTS: Record<SortKey, { label: string; emoji: string; format: (s: WorldStats) => string }> = {
-  playtimeMs: { label: 'Playtime', emoji: '⏱️', format: (s) => formatDuration(s.playtimeMs) },
-  deaths: { label: 'Deaths', emoji: '💀', format: (s) => String(s.deaths) },
-  advancements: { label: 'Advancements', emoji: '🏆', format: (s) => String(s.advancements) },
-  mobKills: { label: 'Mob kills', emoji: '⚔️', format: (s) => String(s.mobKills) },
-  playerKills: { label: 'Player kills', emoji: '🗡️', format: (s) => String(s.playerKills) },
-  diamonds: { label: 'Diamonds mined', emoji: '💎', format: (s) => String(s.diamonds) },
-  distanceKm: { label: 'Distance', emoji: '🥾', format: (s) => `${s.distanceKm.toFixed(1)} km` },
-  blocksMined: { label: 'Blocks mined', emoji: '⛏️', format: (s) => s.blocksMined.toLocaleString('en-US') },
+const SORTS: Record<SortKey, { label: string; format: (s: WorldStats) => string }> = {
+  playtimeMs: { label: 'Playtime', format: (s) => formatDuration(s.playtimeMs) },
+  deaths: { label: 'Deaths', format: (s) => String(s.deaths) },
+  advancements: { label: 'Advancements', format: (s) => String(s.advancements) },
+  mobKills: { label: 'Mob kills', format: (s) => String(s.mobKills) },
+  playerKills: { label: 'Player kills', format: (s) => String(s.playerKills) },
+  diamonds: { label: 'Diamonds mined', format: (s) => String(s.diamonds) },
+  distanceKm: { label: 'Distance', format: (s) => `${s.distanceKm.toFixed(1)} km` },
+  blocksMined: { label: 'Blocks mined', format: (s) => s.blocksMined.toLocaleString('en-US') },
 }
 
 // Fields for one player's card, from the server's own statistics when the data
@@ -94,15 +93,19 @@ export const stats: Command = {
 
     if (world.length) {
       const rows = [...world].sort((a, b) => b[sortKey] - a[sortKey]).slice(0, 10)
-      const embed = brandEmbed().setTitle(`${BRAND.name} leaderboard · ${sort.label}`).setDescription(
-        rows
-          .map((s, i) => {
-            const online = currentSessionMs(s.name) !== null ? ' · 🟢' : ''
-            const extra = sortKey === 'playtimeMs' ? ` · 💀 ${s.deaths} · 🏆 ${s.advancements}` : ` · ⏱️ ${formatDuration(s.playtimeMs)}`
-            return `${MEDALS[i] ?? `**${i + 1}.**`} **${s.name}** · ${sort.emoji} ${sort.format(s)}${extra}${online}`
-          })
-          .join('\n'),
-      )
+      const byPlaytime = sortKey === 'playtimeMs'
+      const columns: [string, (s: WorldStats) => string][] = byPlaytime
+        ? [['Playtime', SORTS.playtimeMs.format], ['Deaths', SORTS.deaths.format], ['Adv', SORTS.advancements.format]]
+        : [[sort.label, sort.format], ['Playtime', SORTS.playtimeMs.format]]
+      const embed = brandEmbed()
+        .setTitle(`${BRAND.name} leaderboard · ${sort.label}`)
+        .setDescription(
+          table(
+            ['#', 'Player', ...columns.map(([label]) => label)],
+            rows.map((s, i) => [String(i + 1), `${s.name}${currentSessionMs(s.name) !== null ? ' *' : ''}`, ...columns.map(([, format]) => format(s))]),
+            ['right', 'left', 'right', 'right', 'right'],
+          ) + '\n`*` online now',
+        )
       await interaction.reply({ embeds: [embed] })
       return
     }
@@ -113,12 +116,14 @@ export const stats: Command = {
       embed.setDescription('No play sessions recorded yet. Stats start counting from the moment the bot started following the server log.')
     } else {
       embed.setDescription(
-        top
-          .map((p, i) => {
+        table(
+          ['#', 'Player', 'Playtime', 'Deaths', 'Adv'],
+          top.map((p, i) => {
             const live = currentSessionMs(p.name)
-            return `${MEDALS[i] ?? `**${i + 1}.**`} **${p.name}** · ⏱️ ${formatDuration(p.playtimeMs + (live ?? 0))} · 💀 ${p.deaths} · 🏆 ${p.advancements}${live !== null ? ' · 🟢' : ''}`
-          })
-          .join('\n'),
+            return [String(i + 1), `${p.name}${live !== null ? ' *' : ''}`, formatDuration(p.playtimeMs + (live ?? 0)), String(p.deaths), String(p.advancements)]
+          }),
+          ['right', 'left', 'right', 'right', 'right'],
+        ) + '\n`*` online now',
       )
     }
     await interaction.reply({ embeds: [embed] })
