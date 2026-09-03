@@ -15,14 +15,14 @@ import { isDangerous, normalizeCommand, runConsole } from './commands/console'
 import { cleanChatText, sendDiscordChat } from './commands/say'
 import { isAdmin } from './utils/access'
 import { awaitConfirmation, confirmRow } from './utils/confirm'
-import { getSetting, getSettingForAllGuilds, type SettingKey } from './utils/db'
+import { getSetting, reconcileSessions } from './utils/db'
+import { handleEvent, postEmbeds } from './utils/events'
 import { tailFile } from './utils/log-tail'
-import { parseLogLine, type McEvent } from './utils/mc-events'
+import { parseLogLine } from './utils/mc-events'
 import { getLiveStatus, type LiveStatus } from './utils/mc-server'
-import { codeBlock } from './utils/mc-text'
+import { codeBlock, dayPhase, ticksToClock } from './utils/mc-text'
 import { RconUnavailable, rconConfigured } from './utils/rcon'
 import { BRAND, SERVER_HOST, headUrl } from './utils/theme'
-import { sendAsPlayer } from './utils/webhook'
 
 // Reading what people type in Discord (console relay, chat bridge) needs the
 // Message Content intent, which has to be switched on in the developer portal first.
@@ -53,6 +53,9 @@ async function registerCommands(c: Client<true>) {
   }
 }
 
+let presenceTick = 0
+
+// Rotates through players, world time and tick health, one per poll.
 function setPresence(c: Client<true>, live: LiveStatus) {
   if (!live.online) {
     c.user.setPresence({
@@ -61,32 +64,19 @@ function setPresence(c: Client<true>, live: LiveStatus) {
     })
     return
   }
+  const lines = [`${live.players.length}/${live.max} on ${BRAND.name}`]
+  if (live.dayTicks !== undefined) {
+    const phase = dayPhase(live.dayTicks)
+    const day = live.gameTime !== undefined ? ` · Day ${Math.floor(live.gameTime / 24000)}` : ''
+    lines.push(`${phase.emoji} ${ticksToClock(live.dayTicks)}${day}`)
+  }
+  if (live.mspt !== undefined) lines.push(`${live.mspt.toFixed(1)} ms/tick · ${live.tickRate ?? 20} TPS`)
+  // Always lead with the player count when someone is on.
+  const name = live.players.length ? lines[presenceTick++ % lines.length]! : lines[0]!
   c.user.setPresence({
-    activities: [{ name: `${live.players.length}/${live.max} on ${BRAND.name}`, type: ActivityType.Watching }],
+    activities: [{ name, type: ActivityType.Watching }],
     status: PresenceUpdateStatus.Online,
   })
-}
-
-async function postEmbeds(c: Client<true>, key: SettingKey, embeds: EmbedBuilder[]) {
-  for (const { guildId, value: channelId } of getSettingForAllGuilds(key)) {
-    try {
-      const channel = await c.channels.fetch(channelId)
-      if (!channel?.isSendable()) continue
-      await channel.send({ embeds: embeds.slice(0, 10) })
-    } catch (e) {
-      console.error(`[${key}] failed to post in ${channelId} (guild ${guildId}):`, (e as Error).message)
-    }
-  }
-}
-
-async function postAsPlayer(c: Client<true>, key: SettingKey, player: string, content: string) {
-  for (const { value: channelId } of getSettingForAllGuilds(key)) {
-    try {
-      await sendAsPlayer(c, channelId, player, content)
-    } catch (e) {
-      console.error(`[${key}] webhook post in ${channelId} failed:`, (e as Error).message)
-    }
-  }
 }
 
 let previous: { online: boolean; players: Set<string>; source: LiveStatus['source'] } | null = null
@@ -130,31 +120,6 @@ async function poll(c: Client<true>) {
     if (!logPath) await announce(c, live)
   } catch (e) {
     console.error('[poll]', e)
-  }
-}
-
-const ADVANCEMENT_LABEL = {
-  advancement: '🏆 *has made the advancement*',
-  goal: '🎯 *has reached the goal*',
-  challenge: '🏅 *has completed the challenge*',
-} as const
-
-async function handleEvent(c: Client<true>, event: McEvent) {
-  switch (event.type) {
-    case 'chat':
-      return postAsPlayer(c, 'chat_channel', event.player, event.text)
-    case 'death':
-      return postAsPlayer(c, 'chat_channel', event.player, `💀 *${event.text}*`)
-    case 'advancement':
-      return postAsPlayer(c, 'chat_channel', event.player, `${ADVANCEMENT_LABEL[event.kind]} **${event.title}**`)
-    case 'join':
-      return postAsPlayer(c, 'activity_channel', event.player, '➡️ *joined the game*')
-    case 'leave':
-      return postAsPlayer(c, 'activity_channel', event.player, '⬅️ *left the game*')
-    case 'started':
-      return postEmbeds(c, 'activity_channel', [new EmbedBuilder().setColor(BRAND.green).setDescription(`🟢 **${BRAND.name} is online**`)])
-    case 'stopping':
-      return postEmbeds(c, 'activity_channel', [new EmbedBuilder().setColor(BRAND.red).setDescription(`🔴 **${BRAND.name} is stopping**`)])
   }
 }
 
@@ -233,7 +198,12 @@ client.once(Events.ClientReady, async (c) => {
   console.log(`Ready! Logged in as ${c.user.tag}`)
   console.log(`RCON ${rconConfigured ? `via ${process.env.RCON_HOST}` : 'not configured, using mcsrvstat only'}`)
   await registerCommands(c).catch((e) => console.error('Command registration failed:', e))
-  await poll(c)
+
+  const live = await getLiveStatus(SERVER_HOST).catch(() => null)
+  if (live) {
+    setPresence(c, live)
+    if (live.source === 'rcon') reconcileSessions(live.players)
+  }
   setInterval(() => poll(c), POLL_MS)
 
   if (logPath) {

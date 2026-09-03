@@ -1,4 +1,4 @@
-import type { Client, Webhook } from 'discord.js'
+import type { Client, EmbedBuilder, Webhook } from 'discord.js'
 import { headUrl } from './theme'
 
 const WEBHOOK_NAME = 'Biggyatia'
@@ -23,10 +23,15 @@ function webhookFor(client: Client<true>, channelId: string): Promise<Webhook> {
   return pending
 }
 
-export async function sendAsPlayer(client: Client<true>, channelId: string, player: string, content: string) {
+export async function sendAsPlayer(
+  client: Client<true>,
+  channelId: string,
+  player: string,
+  payload: { content?: string; embeds?: EmbedBuilder[] },
+) {
   const webhook = await webhookFor(client, channelId)
   await webhook.send({
-    content,
+    ...payload,
     username: player,
     avatarURL: headUrl(player, 128),
     allowedMentions: { parse: [] },

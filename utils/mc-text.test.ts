@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { codeBlock, dayPhase, isValidUsername, stripMcCodes, ticksToClock } from './mc-text'
+import { codeBlock, dayPhase, formatDuration, isValidUsername, stripMcCodes, ticksToClock } from './mc-text'
 
 test('stripMcCodes', () => {
   expect(stripMcCodes('§6§l✦ B I G G Y A T I A ✦§r')).toBe('✦ B I G G Y A T I A ✦')
@@ -33,4 +33,11 @@ test('isValidUsername', () => {
   expect(isValidUsername('GHOST__58')).toBe(true)
   expect(isValidUsername('ab')).toBe(false)
   expect(isValidUsername('bad name')).toBe(false)
+})
+
+test('formatDuration', () => {
+  expect(formatDuration(30_000)).toBe('<1m')
+  expect(formatDuration(5 * 60_000)).toBe('5m')
+  expect(formatDuration(83 * 60_000)).toBe('1h 23m')
+  expect(formatDuration(49 * 3_600_000)).toBe('2d 1h')
 })

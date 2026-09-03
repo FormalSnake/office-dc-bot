@@ -19,6 +19,7 @@ export const help: Command = {
             '`/status` server health, time of day, who is on',
             '`/players` online players with their heads',
             '`/player <name>` skin, online and whitelist status',
+            '`/stats [player]` playtime, deaths and advancements, or the leaderboard',
             '`/join` address, version and how to get whitelisted',
             '`/map` live BlueMap',
           ].join('\n'),

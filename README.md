@@ -8,7 +8,8 @@ Discord bot for the Biggyatia Minecraft server. Shows live status in its presenc
 | --- | --- | --- |
 | `/status` | everyone | online state, players, in-game time, tick health, BlueMap button |
 | `/players` | everyone | online players with their heads |
-| `/player <name>` | everyone | skin render, online and whitelist status |
+| `/player <name>` | everyone | skin render, online, whitelist status and stats |
+| `/stats [player]` | everyone | playtime, deaths and advancements, or the leaderboard |
 | `/join` | everyone | address, version, how to get whitelisted |
 | `/map` | everyone | BlueMap link |
 | `/say <message>` | player role (everyone when unset) | broadcast to in-game chat |
@@ -21,11 +22,11 @@ Discord bot for the Biggyatia Minecraft server. Shows live status in its presenc
 
 ## Channels
 
-- **activity**: joins and leaves (as the player, with their head), server up and down.
-- **chat**: in-game chat, deaths and advancements, each posted through a webhook as the player. With `MESSAGE_CONTENT=1`, messages typed in this channel go in-game as `[Discord] Name: text`.
+- **activity**: joins (with a first-time celebration) and leaves (with session length), server up and down.
+- **chat**: in-game chat as plain text, deaths as red embeds, advancements as gold, aqua or purple embeds. Everything is posted through a webhook as the player, head included. With `MESSAGE_CONTENT=1`, messages typed in this channel go in-game as `[Discord] Name: text`.
 - **console**: `/console` only works here. With `MESSAGE_CONTENT=1` plain messages from admins run as commands too.
 
-Chat, deaths, advancements and joins come from the server log (`MC_LOG_PATH`). Without the log the bot falls back to diffing an RCON `list` every 30 seconds, which gives joins and leaves only.
+Chat, deaths, advancements and joins come from the server log (`MC_LOG_PATH`). The same events feed per-player playtime, death and advancement counters in SQLite. Without the log the bot falls back to diffing an RCON `list` every 30 seconds, which gives joins and leaves only.
 
 ## Setup
 
